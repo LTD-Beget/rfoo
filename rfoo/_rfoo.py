@@ -9,14 +9,14 @@
     Redistribution and use in source and binary forms, with or without modification,
     are permitted provided that the following conditions are met:
 
-    1. Redistributions of source code must retain the above copyright notice, 
+    1. Redistributions of source code must retain the above copyright notice,
     this list of conditions and the following disclaimer.
 
-    2. Redistributions in binary form must reproduce the above copyright 
+    2. Redistributions in binary form must reproduce the above copyright
     notice, this list of conditions and the following disclaimer in the
     documentation and/or other materials provided with the distribution.
 
-    3. Neither the name of Nir Aides nor the names of other contributors may 
+    3. Neither the name of Nir Aides nor the names of other contributors may
     be used to endorse or promote products derived from this software without
     specific prior written permission.
 
@@ -62,9 +62,9 @@ try:
     from rfoo.marsh import dumps, loads
 except ImportError:
     sys.stderr.write("""
-===========================================================    
+===========================================================
 Did you just try to import rfoo directly from its source distribution?
-Well, that's possible, but first you need to build the 
+Well, that's possible, but first you need to build the
 Cython extension rfoo.marsh (inplace) with:
     python setup.py build_ext --inplace
 ===========================================================\n""")
@@ -87,9 +87,9 @@ except ImportError:
 #
 LOOPBACK = '127.0.0.1'
 DEFAULT_PORT = 52431
-BUFFER_SIZE = 4096
+BUFFER_SIZE = 8192
 
-MAX_THREADS = 128
+MAX_THREADS = 1024
 
 CALL = 0
 NOTIFY = 1
@@ -172,7 +172,7 @@ class BaseHandler(object):
         """Return list of public methods.
         Support auto completion by IPython of proxy methods over network.
         """
-        
+
         members = inspect.getmembers(self, inspect.ismethod)
         return [m[0] for m in members if not m[0].startswith('_')]
 
@@ -184,7 +184,7 @@ def restrict_local(foo):
         if self._addr[0] != '127.0.0.1':
             raise ValueError('Attempt to invoke method from remote address.')
         return foo(self, *args, **kwargs)
-    
+
     return _restrict_local
 
 
@@ -223,7 +223,7 @@ class Connection(object):
 
     def write(self, data):
         """Write length prefixed data to socket."""
-        
+
         l = _dumps(len(data))
         self._conn.sendall(l + data)
 
@@ -264,7 +264,7 @@ class InetConnection(Connection):
         self._conn.connect((host, port))
         return self
 
-        
+
 
 class UnixConnection(Connection):
     """Connection type for Unix sockets."""
@@ -347,13 +347,13 @@ class Proxy(object):
 
     def __call__(self, *args, **kwargs):
         """Call method on server."""
-       
+
         data = dumps((CALL, self._name, args, kwargs))
         self._conn.write(data)
-        
+
         response = self._conn.read()
         value, error = loads(response)
-        
+
         if error is None:
             return value
 
@@ -378,7 +378,7 @@ class Proxy(object):
         """Override to raise custom exceptions."""
 
         raise ServerError(name, args)
-            
+
 
 
 class Notifier(Proxy):
@@ -389,10 +389,10 @@ class Notifier(Proxy):
 
     def __call__(self, *args, **kwargs):
         """Call method on server, don't wait for response."""
-       
+
         data = dumps((NOTIFY, self._name, args, kwargs))
         self._conn.write(data)
-        
+
 
 
 g_threads_semaphore = threading.Semaphore(MAX_THREADS)
@@ -421,7 +421,7 @@ class Server(object):
         self._handler_context = handler_context
         self._handler_type = handler_type
         self._conn = conn
-    
+
     def close(self):
         if self._conn is not None:
             try:
@@ -450,7 +450,7 @@ class Server(object):
 
     def _on_accept(self, conn, addr):
         """Serve acceptted connection.
-        Should be used in the context of a threaded server, see 
+        Should be used in the context of a threaded server, see
         threaded_connection(), or fork server (not implemented here).
         """
 
@@ -484,7 +484,7 @@ class Server(object):
             data = conn.read()
             type, name, args, kwargs = loads(data)
 
-            try:    
+            try:
                 foo = handler._methods.get(name, None) or handler._get_method(name)
                 result = foo(*args, **kwargs)
                 error = None
@@ -507,7 +507,7 @@ class Server(object):
 
 class InetServer(Server):
     """Serve calls over INET sockets."""
-    
+
     def __init__(self, handler_type, handler_context=None):
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -516,7 +516,7 @@ class InetServer(Server):
 
     def start(self, host=LOOPBACK, port=DEFAULT_PORT):
         self._conn.bind((host, port))
-        Server.start(self) 
+        Server.start(self)
 
     _on_accept = run_in_thread(Server._on_accept)
 
@@ -524,7 +524,7 @@ class InetServer(Server):
 
 class UnixServer(Server):
     """Serve calls over Unix sockets."""
-    
+
     def __init__(self, handler_type, handler_context=None):
         s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         s.settimeout(None)
@@ -532,7 +532,7 @@ class UnixServer(Server):
 
     def start(self, path):
         self._conn.bind(path)
-        Server.start(self) 
+        Server.start(self)
 
     _on_accept = run_in_thread(Server._on_accept)
 
@@ -544,7 +544,7 @@ class PipeServer(Server):
     def start(self, pipe_socket):
         self._conn = pipe_socket._connect_server()
         self._on_accept(self._conn, 'pipes')
-   
+
 
 
 def start_server(handler, host=LOOPBACK, port=DEFAULT_PORT):
@@ -558,6 +558,6 @@ def connect(host=LOOPBACK, port=DEFAULT_PORT):
     """Connect to server - depracated."""
 
     return InetConnection().connect(host, port)
-    
+
 
 
